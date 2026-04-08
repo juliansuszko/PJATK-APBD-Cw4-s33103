@@ -1,4 +1,5 @@
 using System;
+using LegacyRenewalApp.Discounts;
 using LegacyRenewalApp.Fees;
 using LegacyRenewalApp.Gateways;
 using LegacyRenewalApp.Models;
@@ -19,13 +20,16 @@ namespace LegacyRenewalApp.Services
         private readonly ISubscriptionValidator _subscriptionValidator;
         
         private readonly IFeeCalculator _feeCalculator;
+        
+        private readonly IDiscountCalculator _discountCalculator;
 
         public SubscriptionRenewalService() : this(new TaxCalculator(new TaxRateProvider()),
             new BillingGatewayWrapper(),
             new CustomerRepository(),
             new SubscriptionPlanRepository(),
             new SubscriptionValidator(),
-            new FeeCalculator()
+            new FeeCalculator(),
+            new DiscountCalculator()
             )
         {
             
@@ -36,7 +40,8 @@ namespace LegacyRenewalApp.Services
             ICustomerRepository customerRepository,
             ISubscriptionPlanRepository planRepository,
             ISubscriptionValidator subscriptionValidator,
-            IFeeCalculator feeCalculator
+            IFeeCalculator feeCalculator,
+            IDiscountCalculator  discountCalculator
             )
         {
             _taxCalculator = taxCalculator;
@@ -45,6 +50,7 @@ namespace LegacyRenewalApp.Services
             _planRepository = planRepository;
             _subscriptionValidator = subscriptionValidator;
             _feeCalculator = feeCalculator;
+            _discountCalculator =  discountCalculator;
         }
 
         public RenewalInvoice CreateRenewalInvoice(
@@ -74,70 +80,14 @@ namespace LegacyRenewalApp.Services
             decimal discountAmount = 0m;
             string notes = string.Empty;
 
-            if (customer.Segment == "Silver")
-            {
-                discountAmount += baseAmount * 0.05m;
-                notes += "silver discount; ";
-            }
-            else if (customer.Segment == "Gold")
-            {
-                discountAmount += baseAmount * 0.10m;
-                notes += "gold discount; ";
-            }
-            else if (customer.Segment == "Platinum")
-            {
-                discountAmount += baseAmount * 0.15m;
-                notes += "platinum discount; ";
-            }
-            else if (customer.Segment == "Education" && plan.IsEducationEligible)
-            {
-                discountAmount += baseAmount * 0.20m;
-                notes += "education discount; ";
-            }
-
-            if (customer.YearsWithCompany >= 5)
-            {
-                discountAmount += baseAmount * 0.07m;
-                notes += "long-term loyalty discount; ";
-            }
-            else if (customer.YearsWithCompany >= 2)
-            {
-                discountAmount += baseAmount * 0.03m;
-                notes += "basic loyalty discount; ";
-            }
-
-            if (seatCount >= 50)
-            {
-                discountAmount += baseAmount * 0.12m;
-                notes += "large team discount; ";
-            }
-            else if (seatCount >= 20)
-            {
-                discountAmount += baseAmount * 0.08m;
-                notes += "medium team discount; ";
-            }
-            else if (seatCount >= 10)
-            {
-                discountAmount += baseAmount * 0.04m;
-                notes += "small team discount; ";
-            }
-
-            if (useLoyaltyPoints && customer.LoyaltyPoints > 0)
-            {
-                int pointsToUse = customer.LoyaltyPoints > 200 ? 200 : customer.LoyaltyPoints;
-                discountAmount += pointsToUse;
-                notes += $"loyalty points used: {pointsToUse}; ";
-            }
-
+            var discountResult = _discountCalculator.CalculateTotalDiscount(customer, plan, seatCount, baseAmount, useLoyaltyPoints);
+            
+            discountAmount = discountResult.Amount;
+            notes += discountResult.Note;
+            
             decimal subtotalAfterDiscount = baseAmount - discountAmount;
-            if (subtotalAfterDiscount < 300m)
-            {
-                subtotalAfterDiscount = 300m;
-                notes += "minimum discounted subtotal applied; ";
-            }
 
             decimal supportFee = 0m;
-
             var feeSupportResult = _feeCalculator.CalculateSupportFee(normalizedPlanCode, includePremiumSupport);
             supportFee = feeSupportResult.Amount;
             notes += feeSupportResult.Note;
@@ -148,7 +98,6 @@ namespace LegacyRenewalApp.Services
             notes += feePaymentResult.Note;
 
             decimal taxBase = subtotalAfterDiscount + supportFee + paymentFee;
-            
             var taxResult = _taxCalculator.CalculateTax(taxBase, customer.Country);
             notes += taxResult.AdditionalNotes;
             
