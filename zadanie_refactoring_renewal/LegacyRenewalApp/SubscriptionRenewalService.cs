@@ -5,15 +5,17 @@ namespace LegacyRenewalApp
     public class SubscriptionRenewalService
     {
         private readonly ITaxCalculator _taxCalculator;
+        private readonly IBillingGateway _billingGateway;
 
-        public SubscriptionRenewalService() : this(new TaxCalculator(new TaxRateProvider()))
+        public SubscriptionRenewalService() : this(new TaxCalculator(new TaxRateProvider()), new BillingGatewayWrapper())
         {
             
         }
 
-        public SubscriptionRenewalService(ITaxCalculator taxCalculator)
+        public SubscriptionRenewalService(ITaxCalculator taxCalculator , IBillingGateway billingGateway)
         {
             _taxCalculator = taxCalculator;
+            _billingGateway =  billingGateway;
         }
 
         public RenewalInvoice CreateRenewalInvoice(
@@ -195,7 +197,7 @@ namespace LegacyRenewalApp
                 GeneratedAt = DateTime.UtcNow
             };
 
-            LegacyBillingGateway.SaveInvoice(invoice);
+            _billingGateway.SaveInvoice(invoice);
 
             if (!string.IsNullOrWhiteSpace(customer.Email))
             {
@@ -204,7 +206,7 @@ namespace LegacyRenewalApp
                     $"Hello {customer.FullName}, your renewal for plan {normalizedPlanCode} " +
                     $"has been prepared. Final amount: {invoice.FinalAmount:F2}.";
 
-                LegacyBillingGateway.SendEmail(customer.Email, subject, body);
+                _billingGateway.SendEmail(customer.Email, subject, body);
             }
 
             return invoice;
