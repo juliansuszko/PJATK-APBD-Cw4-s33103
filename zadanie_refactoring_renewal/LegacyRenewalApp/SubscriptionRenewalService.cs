@@ -4,16 +4,16 @@ namespace LegacyRenewalApp
 {
     public class SubscriptionRenewalService
     {
-        private readonly ITaxRateProvider _taxRateProvider;
+        private readonly ITaxCalculator _taxCalculator;
 
-        public SubscriptionRenewalService() : this(new TaxRateProvider())
+        public SubscriptionRenewalService() : this(new TaxCalculator(new TaxRateProvider()))
         {
             
         }
 
-        public SubscriptionRenewalService(ITaxRateProvider taxRateProvider)
+        public SubscriptionRenewalService(ITaxCalculator taxCalculator)
         {
-            _taxRateProvider = taxRateProvider;
+            _taxCalculator = taxCalculator;
         }
 
         public RenewalInvoice CreateRenewalInvoice(
@@ -170,17 +170,11 @@ namespace LegacyRenewalApp
                 throw new ArgumentException("Unsupported payment method");
             }
 
-            decimal taxRate = _taxRateProvider.GetTaxRateForCountry(customer.Country);
-
             decimal taxBase = subtotalAfterDiscount + supportFee + paymentFee;
-            decimal taxAmount = taxBase * taxRate;
-            decimal finalAmount = taxBase + taxAmount;
-
-            if (finalAmount < 500m)
-            {
-                finalAmount = 500m;
-                notes += "minimum invoice amount applied; ";
-            }
+            
+            var taxResult = _taxCalculator.CalculateTax(taxBase, customer.Country);
+            notes += taxResult.AdditionalNotes;
+            
 
             var invoice = new RenewalInvoice
             {
@@ -193,8 +187,10 @@ namespace LegacyRenewalApp
                 DiscountAmount = Math.Round(discountAmount, 2, MidpointRounding.AwayFromZero),
                 SupportFee = Math.Round(supportFee, 2, MidpointRounding.AwayFromZero),
                 PaymentFee = Math.Round(paymentFee, 2, MidpointRounding.AwayFromZero),
-                TaxAmount = Math.Round(taxAmount, 2, MidpointRounding.AwayFromZero),
-                FinalAmount = Math.Round(finalAmount, 2, MidpointRounding.AwayFromZero),
+                
+                TaxAmount = Math.Round(taxResult.TaxAmount, 2, MidpointRounding.AwayFromZero),
+                FinalAmount = Math.Round(taxResult.FinalAmount, 2, MidpointRounding.AwayFromZero),
+                
                 Notes = notes.Trim(),
                 GeneratedAt = DateTime.UtcNow
             };
