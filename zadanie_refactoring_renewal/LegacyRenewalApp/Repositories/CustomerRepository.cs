@@ -5,7 +5,7 @@ using LegacyRenewalApp.Models;
 
 namespace LegacyRenewalApp.Repositories
 {
-    public class CustomerRepository
+    public class CustomerRepository : ICustomerRepository
     {
         public static readonly Dictionary<int, Customer> Database = new Dictionary<int, Customer>
         {

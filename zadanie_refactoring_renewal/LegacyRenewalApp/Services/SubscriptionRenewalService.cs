@@ -10,16 +10,20 @@ namespace LegacyRenewalApp.Services
     {
         private readonly ITaxCalculator _taxCalculator;
         private readonly IBillingGateway _billingGateway;
+        private readonly ICustomerRepository _customerRepository;
+        private readonly ISubscriptionPlanRepository _planRepository;
 
-        public SubscriptionRenewalService() : this(new TaxCalculator(new TaxRateProvider()), new BillingGatewayWrapper())
+        public SubscriptionRenewalService() : this(new TaxCalculator(new TaxRateProvider()), new BillingGatewayWrapper(), new CustomerRepository(),  new SubscriptionPlanRepository())
         {
             
         }
 
-        public SubscriptionRenewalService(ITaxCalculator taxCalculator , IBillingGateway billingGateway)
+        public SubscriptionRenewalService(ITaxCalculator taxCalculator , IBillingGateway billingGateway, ICustomerRepository customerRepository, ISubscriptionPlanRepository planRepository)
         {
             _taxCalculator = taxCalculator;
             _billingGateway =  billingGateway;
+            _customerRepository = customerRepository;
+            _planRepository = planRepository;
         }
 
         public RenewalInvoice CreateRenewalInvoice(
@@ -53,11 +57,9 @@ namespace LegacyRenewalApp.Services
             string normalizedPlanCode = planCode.Trim().ToUpperInvariant();
             string normalizedPaymentMethod = paymentMethod.Trim().ToUpperInvariant();
 
-            var customerRepository = new CustomerRepository();
-            var planRepository = new SubscriptionPlanRepository();
 
-            var customer = customerRepository.GetById(customerId);
-            var plan = planRepository.GetByCode(normalizedPlanCode);
+            var customer = _customerRepository.GetById(customerId);
+            var plan = _planRepository.GetByCode(normalizedPlanCode);
             
 
             if (!customer.IsActive)
