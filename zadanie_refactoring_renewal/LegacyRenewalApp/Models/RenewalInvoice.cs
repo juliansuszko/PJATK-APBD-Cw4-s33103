@@ -1,6 +1,6 @@
 using System;
 
-namespace LegacyRenewalApp
+namespace LegacyRenewalApp.Models
 {
     public class RenewalInvoice
     {

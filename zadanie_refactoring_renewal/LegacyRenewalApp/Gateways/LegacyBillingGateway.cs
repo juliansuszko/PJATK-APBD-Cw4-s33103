@@ -1,7 +1,8 @@
 using System;
 using System.Threading;
+using LegacyRenewalApp.Models;
 
-namespace LegacyRenewalApp
+namespace LegacyRenewalApp.Gateways
 {
     /*
      * DO NOT CHANGE THIS FILE AT ALL

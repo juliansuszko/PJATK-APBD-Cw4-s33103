@@ -1,4 +1,4 @@
-namespace LegacyRenewalApp;
+namespace LegacyRenewalApp.Tax;
 
 public interface ITaxRateProvider
 {

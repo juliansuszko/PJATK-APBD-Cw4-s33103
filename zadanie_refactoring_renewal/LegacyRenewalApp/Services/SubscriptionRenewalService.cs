@@ -1,6 +1,10 @@
 using System;
+using LegacyRenewalApp.Gateways;
+using LegacyRenewalApp.Models;
+using LegacyRenewalApp.Repositories;
+using LegacyRenewalApp.Tax;
 
-namespace LegacyRenewalApp
+namespace LegacyRenewalApp.Services
 {
     public class SubscriptionRenewalService
     {

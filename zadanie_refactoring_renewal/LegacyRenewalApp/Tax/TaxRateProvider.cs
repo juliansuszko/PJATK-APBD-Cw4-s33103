@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace LegacyRenewalApp;
+namespace LegacyRenewalApp.Tax;
 
 public class TaxRateProvider : ITaxRateProvider
 {

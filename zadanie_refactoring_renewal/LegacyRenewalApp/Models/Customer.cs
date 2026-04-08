@@ -1,4 +1,4 @@
-namespace LegacyRenewalApp
+namespace LegacyRenewalApp.Models
 {
     public class Customer
     {
