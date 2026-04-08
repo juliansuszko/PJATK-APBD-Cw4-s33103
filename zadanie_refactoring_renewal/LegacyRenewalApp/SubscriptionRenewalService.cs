@@ -4,6 +4,18 @@ namespace LegacyRenewalApp
 {
     public class SubscriptionRenewalService
     {
+        private readonly ITaxRateProvider _taxRateProvider;
+
+        public SubscriptionRenewalService() : this(new TaxRateProvider())
+        {
+            
+        }
+
+        public SubscriptionRenewalService(ITaxRateProvider taxRateProvider)
+        {
+            _taxRateProvider = taxRateProvider;
+        }
+
         public RenewalInvoice CreateRenewalInvoice(
             int customerId,
             string planCode,
@@ -40,6 +52,7 @@ namespace LegacyRenewalApp
 
             var customer = customerRepository.GetById(customerId);
             var plan = planRepository.GetByCode(normalizedPlanCode);
+            
 
             if (!customer.IsActive)
             {
@@ -157,23 +170,7 @@ namespace LegacyRenewalApp
                 throw new ArgumentException("Unsupported payment method");
             }
 
-            decimal taxRate = 0.20m;
-            if (customer.Country == "Poland")
-            {
-                taxRate = 0.23m;
-            }
-            else if (customer.Country == "Germany")
-            {
-                taxRate = 0.19m;
-            }
-            else if (customer.Country == "Czech Republic")
-            {
-                taxRate = 0.21m;
-            }
-            else if (customer.Country == "Norway")
-            {
-                taxRate = 0.25m;
-            }
+            decimal taxRate = _taxRateProvider.GetTaxRateForCountry(customer.Country);
 
             decimal taxBase = subtotalAfterDiscount + supportFee + paymentFee;
             decimal taxAmount = taxBase * taxRate;
