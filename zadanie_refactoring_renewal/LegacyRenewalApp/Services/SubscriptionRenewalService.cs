@@ -3,6 +3,7 @@ using LegacyRenewalApp.Gateways;
 using LegacyRenewalApp.Models;
 using LegacyRenewalApp.Repositories;
 using LegacyRenewalApp.Tax;
+using LegacyRenewalApp.Validation;
 
 namespace LegacyRenewalApp.Services
 {
@@ -10,20 +11,34 @@ namespace LegacyRenewalApp.Services
     {
         private readonly ITaxCalculator _taxCalculator;
         private readonly IBillingGateway _billingGateway;
+        
         private readonly ICustomerRepository _customerRepository;
         private readonly ISubscriptionPlanRepository _planRepository;
+        
+        private readonly ISubscriptionValidator _subscriptionValidator;
 
-        public SubscriptionRenewalService() : this(new TaxCalculator(new TaxRateProvider()), new BillingGatewayWrapper(), new CustomerRepository(),  new SubscriptionPlanRepository())
+        public SubscriptionRenewalService() : this(new TaxCalculator(new TaxRateProvider()),
+            new BillingGatewayWrapper(),
+            new CustomerRepository(),
+            new SubscriptionPlanRepository(),
+            new SubscriptionValidator()
+            )
         {
             
         }
 
-        public SubscriptionRenewalService(ITaxCalculator taxCalculator , IBillingGateway billingGateway, ICustomerRepository customerRepository, ISubscriptionPlanRepository planRepository)
+        public SubscriptionRenewalService(ITaxCalculator taxCalculator,
+            IBillingGateway billingGateway,
+            ICustomerRepository customerRepository,
+            ISubscriptionPlanRepository planRepository,
+            ISubscriptionValidator subscriptionValidator
+            )
         {
             _taxCalculator = taxCalculator;
             _billingGateway =  billingGateway;
             _customerRepository = customerRepository;
             _planRepository = planRepository;
+            _subscriptionValidator = subscriptionValidator;
         }
 
         public RenewalInvoice CreateRenewalInvoice(
@@ -34,25 +49,7 @@ namespace LegacyRenewalApp.Services
             bool includePremiumSupport,
             bool useLoyaltyPoints)
         {
-            if (customerId <= 0)
-            {
-                throw new ArgumentException("Customer id must be positive");
-            }
-
-            if (string.IsNullOrWhiteSpace(planCode))
-            {
-                throw new ArgumentException("Plan code is required");
-            }
-
-            if (seatCount <= 0)
-            {
-                throw new ArgumentException("Seat count must be positive");
-            }
-
-            if (string.IsNullOrWhiteSpace(paymentMethod))
-            {
-                throw new ArgumentException("Payment method is required");
-            }
+            _subscriptionValidator.Validate(customerId, planCode, seatCount, paymentMethod);
 
             string normalizedPlanCode = planCode.Trim().ToUpperInvariant();
             string normalizedPaymentMethod = paymentMethod.Trim().ToUpperInvariant();
