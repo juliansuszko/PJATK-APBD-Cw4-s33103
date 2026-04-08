@@ -1,4 +1,5 @@
 using System;
+using LegacyRenewalApp.Fees;
 using LegacyRenewalApp.Gateways;
 using LegacyRenewalApp.Models;
 using LegacyRenewalApp.Repositories;
@@ -16,12 +17,15 @@ namespace LegacyRenewalApp.Services
         private readonly ISubscriptionPlanRepository _planRepository;
         
         private readonly ISubscriptionValidator _subscriptionValidator;
+        
+        private readonly IFeeCalculator _feeCalculator;
 
         public SubscriptionRenewalService() : this(new TaxCalculator(new TaxRateProvider()),
             new BillingGatewayWrapper(),
             new CustomerRepository(),
             new SubscriptionPlanRepository(),
-            new SubscriptionValidator()
+            new SubscriptionValidator(),
+            new FeeCalculator()
             )
         {
             
@@ -31,7 +35,8 @@ namespace LegacyRenewalApp.Services
             IBillingGateway billingGateway,
             ICustomerRepository customerRepository,
             ISubscriptionPlanRepository planRepository,
-            ISubscriptionValidator subscriptionValidator
+            ISubscriptionValidator subscriptionValidator,
+            IFeeCalculator feeCalculator
             )
         {
             _taxCalculator = taxCalculator;
@@ -39,6 +44,7 @@ namespace LegacyRenewalApp.Services
             _customerRepository = customerRepository;
             _planRepository = planRepository;
             _subscriptionValidator = subscriptionValidator;
+            _feeCalculator = feeCalculator;
         }
 
         public RenewalInvoice CreateRenewalInvoice(
@@ -131,49 +137,15 @@ namespace LegacyRenewalApp.Services
             }
 
             decimal supportFee = 0m;
-            if (includePremiumSupport)
-            {
-                if (normalizedPlanCode == "START")
-                {
-                    supportFee = 250m;
-                }
-                else if (normalizedPlanCode == "PRO")
-                {
-                    supportFee = 400m;
-                }
-                else if (normalizedPlanCode == "ENTERPRISE")
-                {
-                    supportFee = 700m;
-                }
 
-                notes += "premium support included; ";
-            }
+            var feeSupportResult = _feeCalculator.CalculateSupportFee(normalizedPlanCode, includePremiumSupport);
+            supportFee = feeSupportResult.Amount;
+            notes += feeSupportResult.Note;
 
             decimal paymentFee = 0m;
-            if (normalizedPaymentMethod == "CARD")
-            {
-                paymentFee = (subtotalAfterDiscount + supportFee) * 0.02m;
-                notes += "card payment fee; ";
-            }
-            else if (normalizedPaymentMethod == "BANK_TRANSFER")
-            {
-                paymentFee = (subtotalAfterDiscount + supportFee) * 0.01m;
-                notes += "bank transfer fee; ";
-            }
-            else if (normalizedPaymentMethod == "PAYPAL")
-            {
-                paymentFee = (subtotalAfterDiscount + supportFee) * 0.035m;
-                notes += "paypal fee; ";
-            }
-            else if (normalizedPaymentMethod == "INVOICE")
-            {
-                paymentFee = 0m;
-                notes += "invoice payment; ";
-            }
-            else
-            {
-                throw new ArgumentException("Unsupported payment method");
-            }
+            var feePaymentResult = _feeCalculator.CalculatePaymentFee(normalizedPaymentMethod, (subtotalAfterDiscount + supportFee));
+            paymentFee = feePaymentResult.Amount;
+            notes += feePaymentResult.Note;
 
             decimal taxBase = subtotalAfterDiscount + supportFee + paymentFee;
             
