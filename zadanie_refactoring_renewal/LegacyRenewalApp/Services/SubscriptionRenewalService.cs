@@ -12,7 +12,6 @@ namespace LegacyRenewalApp.Services
     public class SubscriptionRenewalService
     {
         private readonly ITaxCalculator _taxCalculator;
-        private readonly IBillingGateway _billingGateway;
         
         private readonly ICustomerRepository _customerRepository;
         private readonly ISubscriptionPlanRepository _planRepository;
@@ -22,35 +21,37 @@ namespace LegacyRenewalApp.Services
         private readonly IFeeCalculator _feeCalculator;
         
         private readonly IDiscountCalculator _discountCalculator;
+        
+        private readonly IInvoiceProcessor _invoiceProcessor;
 
         public SubscriptionRenewalService() : this(new TaxCalculator(new TaxRateProvider()),
-            new BillingGatewayWrapper(),
             new CustomerRepository(),
             new SubscriptionPlanRepository(),
             new SubscriptionValidator(),
             new FeeCalculator(),
-            new DiscountCalculator()
+            new DiscountCalculator(),
+            new InvoiceProcessor(new BillingGatewayWrapper())
             )
         {
             
         }
 
         public SubscriptionRenewalService(ITaxCalculator taxCalculator,
-            IBillingGateway billingGateway,
             ICustomerRepository customerRepository,
             ISubscriptionPlanRepository planRepository,
             ISubscriptionValidator subscriptionValidator,
             IFeeCalculator feeCalculator,
-            IDiscountCalculator  discountCalculator
+            IDiscountCalculator  discountCalculator,
+            IInvoiceProcessor  invoiceProcessor
             )
         {
             _taxCalculator = taxCalculator;
-            _billingGateway =  billingGateway;
             _customerRepository = customerRepository;
             _planRepository = planRepository;
             _subscriptionValidator = subscriptionValidator;
             _feeCalculator = feeCalculator;
             _discountCalculator =  discountCalculator;
+            _invoiceProcessor = invoiceProcessor;
         }
 
         public RenewalInvoice CreateRenewalInvoice(
@@ -77,24 +78,21 @@ namespace LegacyRenewalApp.Services
             }
 
             decimal baseAmount = (plan.MonthlyPricePerSeat * seatCount * 12m) + plan.SetupFee;
-            decimal discountAmount = 0m;
             string notes = string.Empty;
 
             var discountResult = _discountCalculator.CalculateTotalDiscount(customer, plan, seatCount, baseAmount, useLoyaltyPoints);
             
-            discountAmount = discountResult.Amount;
+            var discountAmount = discountResult.Amount;
             notes += discountResult.Note;
             
             decimal subtotalAfterDiscount = baseAmount - discountAmount;
 
-            decimal supportFee = 0m;
             var feeSupportResult = _feeCalculator.CalculateSupportFee(normalizedPlanCode, includePremiumSupport);
-            supportFee = feeSupportResult.Amount;
+            var supportFee = feeSupportResult.Amount;
             notes += feeSupportResult.Note;
 
-            decimal paymentFee = 0m;
             var feePaymentResult = _feeCalculator.CalculatePaymentFee(normalizedPaymentMethod, (subtotalAfterDiscount + supportFee));
-            paymentFee = feePaymentResult.Amount;
+            var paymentFee = feePaymentResult.Amount;
             notes += feePaymentResult.Note;
 
             decimal taxBase = subtotalAfterDiscount + supportFee + paymentFee;
@@ -120,18 +118,8 @@ namespace LegacyRenewalApp.Services
                 Notes = notes.Trim(),
                 GeneratedAt = DateTime.UtcNow
             };
-
-            _billingGateway.SaveInvoice(invoice);
-
-            if (!string.IsNullOrWhiteSpace(customer.Email))
-            {
-                string subject = "Subscription renewal invoice";
-                string body =
-                    $"Hello {customer.FullName}, your renewal for plan {normalizedPlanCode} " +
-                    $"has been prepared. Final amount: {invoice.FinalAmount:F2}.";
-
-                _billingGateway.SendEmail(customer.Email, subject, body);
-            }
+            
+            _invoiceProcessor.ProcessInvoice(invoice, customer);
 
             return invoice;
         }
